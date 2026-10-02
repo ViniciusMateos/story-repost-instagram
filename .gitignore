@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+output/
+proxy.json
+perfis.json
+*cookies*.json
+session_cookies.json
+sessions/
+*.log
+.DS_Store
+# capa que a instagrapi gera ao lado do vídeo de abertura
+assets/*.mp4.jpg
