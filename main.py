@@ -34,7 +34,24 @@ def _fatal(e):
     n = type(e).__name__.lower()
     m = str(e).lower()
     return (any(t in n for t in ("loginrequired", "challenge", "feedback", "pleasewait", "ratelimit"))
-            or any(t in m for t in ("login_required", "challenge_required", "checkpoint", "feedback_required")))
+            or any(t in m for t in ("login_required", "challenge_required", "checkpoint", "feedback_required"))
+            or _restrita_upload(e))
+
+
+def _restrita_upload(e):
+    """O IG restringiu os ENVIOS da conta ("User restricted from uploading, please try later") —
+    castigo temporário por postar demais. Insistir peça a peça só piora (19/10: 10 tentativas
+    seguidas na conta do brechó, um dia depois de começar). Para na hora e marca bloqueio."""
+    return "restricted from uploading" in str(e).lower()
+
+
+def _barrada(e):
+    """Exceção ContaBarrada com a mensagem certa (restrição de envio vira BLOQUEIO no app)."""
+    if _restrita_upload(e):
+        return ContaBarrada("BLOQUEIO: o Instagram restringiu os envios da conta (restricted from "
+                            "uploading) — parei na 1ª pra não piorar. Espere 24-48h e confira em "
+                            "Definições → Estado da conta no app do IG")
+    return ContaBarrada(f"o IG barrou a conta ({str(e)[:80]})")
 
 
 class ContaBarrada(Exception):
@@ -135,7 +152,7 @@ def run_conta(dry, rotulo="", ignorar_janela=False):
                 saldo["abertura"] = 1
             except Exception as e:
                 if "login_required" in str(e).lower() or _fatal(e):
-                    raise ContaBarrada(f"o IG barrou a conta ({str(e)[:80]})") from e
+                    raise _barrada(e) from e
                 log.warning("  ! não consegui postar o vídeo de abertura (%s) — sigo com as peças", str(e)[:90])
         for i, p in enumerate(alvos):
             if i > 0 or intro:
@@ -153,7 +170,7 @@ def run_conta(dry, rotulo="", ignorar_janela=False):
                     raise ContaBarrada("sem permissão de postar story pela API (login_required) — "
                                        "sessão barrada; reconecta a conta") from e
                 if _fatal(e):
-                    raise ContaBarrada(f"o IG barrou a conta ({str(e)[:80]})") from e
+                    raise _barrada(e) from e
                 saldo["falhas"] += 1
                 log.warning("  ! não consegui repostar %s (%s) — pulo essa peça", p["code"], str(e)[:90])
                 continue
