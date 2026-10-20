@@ -25,7 +25,6 @@ from safety import log
 
 _POSTS_CACHE = os.path.join(config.OUTPUT_DIR, "posts_brecho.json")   # {"codes": {num: code}, "legendas": {code: texto}}
 _POSTS_TTL = 12 * 3600
-_POSTS_QTD_COMPLETO = 800
 
 
 def todas_pecas(timeout=60):
@@ -95,16 +94,17 @@ def pecas_disponiveis(pz=None, timeout=60):
     return out
 
 
-_COMPLETO_TTL = 3 * 24 * 3600     # leitura COMPLETA no máx a cada 3 dias (link de foto do IG expira)
-_COMPLETO_MIN = 6 * 3600          # …ou antes, se faltar peça — mas não mais que 1x a cada 6h
+_COMPLETO_MIN = 6 * 3600          # leitura COMPLETA só quando falta peça — no máx 1x a cada 6h
+FOTOS_DIR = os.path.join(config.OUTPUT_DIR, "fotos")   # foto de cada post, salva 1x (o link do IG expira)
 _RECENTES_QTD = 60                # leitura CURTA (a cada 12h): só os posts mais novos
 
 
 def _posts_brecho(ig, codes_precisa=(), nums_precisa=()):
     """{codes, legendas, fotos} dos posts do brechó, com cache em output/posts_brecho.json.
     Leitura INCREMENTAL (o brechó tem centenas de posts e as peças do histórico são antigas):
-      - COMPLETA (até 800 posts, alguns minutos): sem cache, a cada 3 dias (link de foto expira)
-        ou quando falta alguma peça que a gente precisa (no máx 1x/6h);
+      - COMPLETA (todos os posts, ~3 min): só sem cache ou quando falta alguma peça que a gente
+        precisa (no máx 1x/6h). Não precisa renovar por causa do link de foto expirar: a foto de
+        cada peça é salva no server na 1ª vez que posta (output/fotos/<code>.jpg);
       - CURTA (60 mais novos): a cada 12h — pega post novo e legenda editada ("VENDIDO")."""
     cache = {"codes": {}, "legendas": {}, "fotos": {}, "completo_em": 0, "lido_em": 0}
     try:
@@ -114,19 +114,23 @@ def _posts_brecho(ig, codes_precisa=(), nums_precisa=()):
     except Exception:
         pass
     agora = time.time()
-    faltam = ([c for c in codes_precisa if c and c not in cache["fotos"]]
+    faltam = ([c for c in codes_precisa if c and c not in cache["legendas"]]
               + [n for n in nums_precisa if str(n) not in cache["codes"]])
-    if (not cache["completo_em"] or agora - cache["completo_em"] > _COMPLETO_TTL
-            or (faltam and agora - cache["completo_em"] > _COMPLETO_MIN)):
-        qtd, completo = _POSTS_QTD_COMPLETO, True
+    if not cache["completo_em"] or (faltam and agora - cache["completo_em"] > _COMPLETO_MIN):
+        qtd, completo = 0, True                         # 0 = todos os posts
     elif agora - cache["lido_em"] > _POSTS_TTL:
         qtd, completo = _RECENTES_QTD, False
     else:
         return cache
     try:
-        log.info("Lendo %s posts do brechó (legendas + fotos)%s…", qtd,
-                 " — leitura completa, demora uns minutos" if completo else "")
+        if completo:
+            log.info("Lendo TODOS os posts do brechó (%s peça(s) sem post no cache) — demora uns minutos…",
+                     len(faltam) if cache["completo_em"] else "1ª leitura,")
+        else:
+            log.info("Lendo os %d posts mais novos do brechó (posts novos / legenda VENDIDO)…", qtd)
+        lidos = 0
         for m in ig.cl.user_medias(config.BRECHO_UID, amount=qtd):
+            lidos += 1
             texto = m.caption_text or ""
             cache["legendas"][m.code] = texto
             foto = ""                                   # 1ª imagem do post (carrossel → 1ª mídia), igual o feed
@@ -136,6 +140,7 @@ def _posts_brecho(ig, codes_precisa=(), nums_precisa=()):
             for n in re.findall(r"#p(\d+)\b", texto):
                 cache["codes"].setdefault(n, m.code)
         cache["lido_em"] = agora
+        log.info("  %d posts lidos.", lidos)
         if completo:
             cache["completo_em"] = agora
         os.makedirs(config.OUTPUT_DIR, exist_ok=True)
@@ -166,6 +171,7 @@ def ligar_posts(pecas, ig):
             # foto SEMPRE do post (a do app pode ser a crua, ex: peça manual); a do app é reserva
             p["imagem_reserva"] = p.get("imagem_url")
             p["imagem_url"] = posts["fotos"].get(p["code"]) or p.get("imagem_url")
+            p["foto_local"] = os.path.join(FOTOS_DIR, f"{p['code']}.jpg")   # usada se já existir
             out.append(p)
     return out
 

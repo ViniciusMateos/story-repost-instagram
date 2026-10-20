@@ -145,6 +145,7 @@ def run_conta(dry, rotulo="", ignorar_janela=False):
             try:
                 sid = ig.postar_code(p["code"], config.REPOST_CARD, config.TEXTO, config.LINK,
                                      img_url=[p.get("imagem_url"), p.get("imagem_reserva")],
+                                     foto_local=p.get("foto_local"),
                                      legenda=p.get("nome") or "",
                                      etiqueta=etiqueta.linhas(p, p.get("descricao")))
             except Exception as e:

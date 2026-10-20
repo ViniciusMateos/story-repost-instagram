@@ -332,18 +332,24 @@ class IG:
             f.write(r.read())
         return out
 
-    def postar_code(self, code, repost_card, texto, link, img_url=None, autor=None, legenda="",
+    def postar_code(self, code, repost_card, texto, link, img_url=None, autor=None, legenda="", foto_local=None,
                     etiqueta=None):
         """Posta no story o post de QUALQUER conta pública pelo `code` (ex: peça do brechó, repostada
         por uma conta-vitrine). A foto é OBRIGATÓRIA (é ela que vira o card desenhado): tenta a que
         o brechó já tem da peça (`img_url`), depois a API do IG. Sem foto, não posta (story preto)."""
         pk = self.media_pk(code)
         img = None
+        if foto_local and os.path.exists(foto_local):   # já salva numa run anterior (link do IG expira)
+            img = foto_local
         for u in ([img_url] if isinstance(img_url, str) else (img_url or [])):   # em ordem: post, depois a do app
             if not u or img:
                 continue
             try:
                 img = self._baixar_url(u)
+                if foto_local:                            # guarda pra próxima vez
+                    os.makedirs(os.path.dirname(foto_local), exist_ok=True)
+                    import shutil
+                    shutil.copyfile(img, foto_local)
             except Exception as e:
                 log.warning("  ~ foto não baixou (%s) — tento a próxima", str(e)[:50])
         if not img:
