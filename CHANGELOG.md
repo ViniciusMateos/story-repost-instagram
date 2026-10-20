@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.1] — 2026-10-20
+
+### Modificado
+- update: guarda a foto de cada peça no servidor e só relê todos os posts quando falta peça (antes relia tudo a cada 3 dias só pra renovar o link da foto)
+
+### Corrigido
+- fix: para na hora quando o Instagram restringe os envios da conta ("restricted from uploading") e marca bloqueio no app, em vez de insistir peça a peça
+
+### Documentação
+- docs: PROJETO.md com a visão de ponta a ponta do bot
+
 ## [1.0.0] — 2026-10-02
 
 ### Adicionado
